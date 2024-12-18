@@ -5,7 +5,7 @@ import java.io.InputStreamReader;
 import java.util.Map;
 import java.util.function.Consumer;
 
-public class PHPJava {
+public class JavaPHP {
     private final String PHP_BIN_PATH;
     private final boolean NO_PHP_WARN;
 
@@ -18,7 +18,7 @@ public class PHPJava {
      * Creates a PHPJava instance
      * @param php_bin_path PHP binary file path (e.g /usr/bin/php)
      */
-    public PHPJava(String php_bin_path, boolean ignorePHPWarnings){
+    public JavaPHP(String php_bin_path, boolean ignorePHPWarnings){
         this.PHP_BIN_PATH = php_bin_path;
         this.NO_PHP_WARN = ignorePHPWarnings;
     }
@@ -27,7 +27,7 @@ public class PHPJava {
      * Creates a PHPJava instance
      * @param ignorePHPWarnings Specifies if PHP Warning and PHP Startup errors should be ignored
      */
-    public PHPJava(boolean ignorePHPWarnings){
+    public JavaPHP(boolean ignorePHPWarnings){
         this.PHP_BIN_PATH = "php";
         this.NO_PHP_WARN = ignorePHPWarnings;
     }
@@ -35,7 +35,7 @@ public class PHPJava {
     /**
      * Creates a PHPJava instance
      */
-    public PHPJava(){
+    public JavaPHP(){
         this.PHP_BIN_PATH = "php";
         this.NO_PHP_WARN = false;
     }
@@ -51,7 +51,7 @@ public class PHPJava {
     }
 
     /**
-     * Runs the PHP file specified in the {@link PHPJava} constructor.<br><br>
+     * Runs the PHP file specified in the {@link JavaPHP} constructor.<br><br>
      * The result can be retrieved with {@link #getResult()} function.
      *
      * @param php_filepath The file path of the PHP file to be executed.

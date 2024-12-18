@@ -17,19 +17,17 @@ import java.util.Map;
 
 public class Main {
     public static void main(String[] args) throws Throwable {
-        PHPJava phpjava = new PHPJava(false); // Determines if PHP errors should be ignored
-        Map<String, String> env = new HashMap<>(); // Stores PHP global variables (e.g REQUEST_METHOD, etc...)
+        JavaPHP javaphp = new JavaPHP(false);
+        Map<String, String> env = new HashMap<>();
 
         env.put("REQUEST_METHOD", "GET");
-        
-        // Defines a lambda function that will be called each time an error occurs
-        phpjava.setErrorCallback((error) -> System.out.println("ERROR: " + error));
-        
-        phpjava.setPHPVars(env); // Gives the global variables to the PHP file
-        phpjava.run(new File("./test.php").getAbsolutePath()); // Runs the PHP file
 
-        // Prints the result (HTML code if used with a webserver)
-        System.out.println(phpjava.getResult());
+        javaphp.setErrorCallback((error) -> System.out.println("ERROR: " + error));
+
+        javaphp.setPHPVars(env);
+        javaphp.run(new File("./test.php").getAbsolutePath());
+
+        System.out.println(javaphp.getResult());
     }
 }
 ```

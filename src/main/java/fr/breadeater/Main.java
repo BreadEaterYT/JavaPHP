@@ -11,17 +11,17 @@ import java.util.Map;
 public class Main {
     public static void main(String[] args) throws Throwable {
         /*
-        PHPJava phpjava = new PHPJava(false);
+        JavaPHP javaphp = new JavaPHP(false);
         Map<String, String> env = new HashMap<>();
 
         env.put("REQUEST_METHOD", "GET");
 
-        phpjava.setErrorCallback((error) -> System.out.println("ERROR: " + error));
+        javaphp.setErrorCallback((error) -> System.out.println("ERROR: " + error));
 
-        phpjava.setPHPVars(env);
-        phpjava.run(new File("./test.php").getAbsolutePath());
+        javaphp.setPHPVars(env);
+        javaphp.run(new File("./test.php").getAbsolutePath());
 
-        System.out.println(phpjava.getResult());
+        System.out.println(javaphp.getResult());
         */
     }
 }
