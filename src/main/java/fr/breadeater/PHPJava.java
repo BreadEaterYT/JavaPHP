@@ -3,6 +3,7 @@ package fr.breadeater;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.util.Map;
+import java.util.function.Consumer;
 
 public class PHPJava {
     private final String PHP_BIN_PATH;
@@ -10,6 +11,8 @@ public class PHPJava {
 
     private Map<String, String> env_vars;
     private String response = null;
+
+    private Consumer<String> ERR_CALLBACK;
 
     /**
      * Creates a PHPJava instance
@@ -67,12 +70,11 @@ public class PHPJava {
         } catch (Throwable error){
             String err = error.getMessage();
 
-            if (!this.NO_PHP_WARN && (err.contains("PHP Warning:") || err.contains("PHP Startup:"))){
-                onError(err);
-            }
+            if (!this.NO_PHP_WARN && (err.contains("PHP Warning:") || err.contains("PHP Startup:"))) onError(err);
         }
 
         assert process != null;
+
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))){
             StringBuilder resBuilder = new StringBuilder();
             String line;
@@ -91,11 +93,17 @@ public class PHPJava {
             if (!errorBuilder.toString().isEmpty()){
                 String err = new Throwable(errorBuilder.toString()).getMessage();
 
-                if (!this.NO_PHP_WARN && (err.contains("PHP Warning:") || err.contains("PHP Startup:"))){
-                    onError(err);
-                }
+                if (!this.NO_PHP_WARN && (err.contains("PHP Warning:") || err.contains("PHP Startup:"))) onError(err);
             }
         }
+    }
+
+    /**
+     * Sets the function that will be called to handle the error instead of printing it into the console
+     * @param cb The function to be executed on error
+     */
+    public void setErrorCallback(Consumer<String> cb){
+        this.ERR_CALLBACK = cb;
     }
 
     /**
@@ -107,10 +115,15 @@ public class PHPJava {
     }
 
     /**
-     * Error event listener, outputs error with System.err by default, it needs to be overridden
+     * Error event listener, outputs error with System.err by default, to set custom error handler, use {@link #setErrorCallback}
      * @param error The error
      */
-    public void onError(String error){
-        System.err.println(error);
+    private void onError(String error){
+        if (this.ERR_CALLBACK == null) {
+            System.err.println(error);
+            return;
+        }
+
+        this.ERR_CALLBACK.accept(error);
     }
 }
