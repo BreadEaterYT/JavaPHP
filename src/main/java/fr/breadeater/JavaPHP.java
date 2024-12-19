@@ -6,17 +6,18 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 public class JavaPHP {
+    private Consumer<String> ERR_CALLBACK;
+
     private final String PHP_BIN_PATH;
     private final boolean NO_PHP_WARN;
 
     private Map<String, String> env_vars;
     private String response = null;
 
-    private Consumer<String> ERR_CALLBACK;
-
     /**
-     * Creates a PHPJava instance
+     * Creates a JavaPHP instance
      * @param php_bin_path PHP binary file path (e.g /usr/bin/php)
+     * @param ignorePHPWarnings Specifies if PHP Warning and PHP Startup errors should be ignored
      */
     public JavaPHP(String php_bin_path, boolean ignorePHPWarnings){
         this.PHP_BIN_PATH = php_bin_path;
@@ -24,7 +25,7 @@ public class JavaPHP {
     }
 
     /**
-     * Creates a PHPJava instance
+     * Creates a JavaPHP instance
      * @param ignorePHPWarnings Specifies if PHP Warning and PHP Startup errors should be ignored
      */
     public JavaPHP(boolean ignorePHPWarnings){
@@ -33,7 +34,7 @@ public class JavaPHP {
     }
 
     /**
-     * Creates a PHPJava instance
+     * Creates a JavaPHP instance
      */
     public JavaPHP(){
         this.PHP_BIN_PATH = "php";
@@ -43,8 +44,9 @@ public class JavaPHP {
     /**
      * Sets PHP global variables like REQUEST_METHOD, REQUEST_ADDR, etc...<br>
      * See <a href="https://www.php.net/manual/en/reserved.variables.php">PHP global variables</a> for other examples.<br><br>
-     *
      * WARNING: THIS IS REQUIRED IF USING $_SERVER VARIABLES OR OTHERS !
+     *
+     * @param variables The PHP global variables
      */
     public void setPHPVars(Map<String, String> variables){
         this.env_vars = variables;

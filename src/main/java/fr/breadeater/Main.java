@@ -10,7 +10,6 @@ import java.util.Map;
 
 public class Main {
     public static void main(String[] args) throws Throwable {
-        /*
         JavaPHP javaphp = new JavaPHP(false);
         Map<String, String> env = new HashMap<>();
 
@@ -22,6 +21,5 @@ public class Main {
         javaphp.run(new File("./test.php").getAbsolutePath());
 
         System.out.println(javaphp.getResult());
-        */
     }
 }

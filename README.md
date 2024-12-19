@@ -4,16 +4,23 @@ JavaPHP is a lightweight Java library that permits to execute PHP code into Java
 you can just use PHP and execute it as a part of your existing Java code, does not rely on any dependencies, its fully standalone,
 and you can use it in a compiled .jar file or in a simple .java file without having to compile it
 
+Fun fact: this library was made in like 1 day because i had no other ideas and i was bored so yeah, now this library exists.
+
 ### Features
 - PHP file execution in java
 - Customizable error handling
 
+There are not alot of features because i keep it very simple, why would i do a lot of features since its focused only on the purpose of executing PHP in Java.
+
 ### How to use
 Simply import it to your file and do like this:
+
 ```java
 import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
+
+import fr.breadeater.JavaPHP;
 
 public class Main {
     public static void main(String[] args) throws Throwable {
@@ -33,10 +40,8 @@ public class Main {
 ```
 
 ### Installation
-Simply download the .jar / .java file from the repository Releases and import it in your project
-
-To import the .java file, simply drag it into your project folder.<br>
-To import the .jar file, simply use Maven / Gradle and add new dependency to your configuration that points to the .jar file
+Simply download the .jar / .java file from the repository Releases and import it in your project.<br>
+For Maven or Gradle, add it to your local repository.
 
 ### Contribution
 You can contribute as much as you want, the conditions: 
@@ -50,5 +55,4 @@ You can contribute as much as you want, the conditions:
 You can contact me via [mail](mailto:contact@breadeater.fr) or send message in the discussions of the repository
 
 ### License
-
 This project is licensed under the MIT license, see [LICENSE](./LICENSE) for more infos.
