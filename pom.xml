@@ -21,7 +21,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>fr.breadeater.JavaPHP</mainClass>
+                            <mainClass>fr.breadeater.Main</mainClass>
                         </manifest>
                     </archive>
                     <descriptorRefs>

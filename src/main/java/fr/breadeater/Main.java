@@ -19,7 +19,9 @@ public class Main {
 
         javaphp.setPHPVars(env);
         javaphp.run(new File("./test.php").getAbsolutePath());
+        javaphp.runWithCli("echo 'Hello World !';");
 
         System.out.println(javaphp.getResult());
+        System.out.println(javaphp.getInlineResult());
     }
 }

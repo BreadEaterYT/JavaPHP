@@ -2,16 +2,19 @@ package fr.breadeater;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.function.Consumer;
 
 public class JavaPHP {
-    private Consumer<String> ERR_CALLBACK;
-
+    // Private immutable variables
     private final String PHP_BIN_PATH;
     private final boolean NO_PHP_WARN;
 
+    // Private variables
+    private Consumer<String> ERR_CALLBACK;
     private Map<String, String> env_vars;
+    private String inlineResponse = null;
     private String response = null;
 
     /**
@@ -75,7 +78,105 @@ public class JavaPHP {
             if (!this.NO_PHP_WARN && (err.contains("PHP Warning:") || err.contains("PHP Startup:"))) onError(err);
         }
 
-        assert process != null;
+        if (process == null){
+            onError(new Throwable("Error while executing PHP file at " + php_filepath));
+            return;
+        }
+
+        this.response = processOutputHandler(process);
+    }
+
+    /**
+     * Runs PHP code using PHP CLI '-r' argument
+     * The result can be retrieved with {@link #getInlineResult} function.
+     *
+     * @param php_code The PHP Code
+     */
+    public void runWithCli(String php_code) throws Throwable {
+        ProcessBuilder processBuilder = new ProcessBuilder(this.PHP_BIN_PATH, "-r", php_code);
+        Process process = null;
+
+        if (this.env_vars != null){
+            Map<String, String> environment = processBuilder.environment();
+            environment.putAll(this.env_vars);
+        }
+
+        try {
+            process = processBuilder.start();
+        } catch (Throwable error){
+            String err = error.getMessage();
+
+            if (!this.NO_PHP_WARN && (err.contains("PHP Warning:") || err.contains("PHP Startup:"))) onError(err);
+        }
+
+        if (process == null){
+            onError(new Throwable("Error while executing PHP code"));
+            return;
+        }
+
+        this.inlineResponse = processOutputHandler(process);
+    }
+
+    /**
+     * Sets the function that will be called to handle the error instead of printing it into the console
+     * @param cb The function to be executed on error
+     */
+    public void setErrorCallback(Consumer<String> cb){
+        this.ERR_CALLBACK = cb;
+    }
+
+    /**
+     * Gets the result of the executed PHP file
+     * @return The result, returns null if no results
+     */
+    public String getResult(){
+        return this.response;
+    }
+
+    /**
+     * Gets the result of the inline PHP code
+     * @return The result, returns null if no results
+     */
+    public String getInlineResult(){
+        return this.inlineResponse;
+    }
+
+    /**
+     * Error event listener, outputs error with 'System.err' by default, to set custom error handler, use {@link #setErrorCallback}
+     * @param error The error
+     */
+    private void onError(String error){
+        if (this.ERR_CALLBACK == null) {
+            System.err.println(error);
+            return;
+        }
+
+        this.ERR_CALLBACK.accept(error);
+    }
+
+    /**
+     * Error event listener, outputs error with 'System.err' by default, to set custom error handler, use {@link #setErrorCallback}
+     * @param error The error
+     */
+    private void onError(Throwable error){
+        String err = Arrays.toString(error.getStackTrace());
+
+        if (this.ERR_CALLBACK == null){
+            System.err.println(err);
+            return;
+        }
+
+        this.ERR_CALLBACK.accept(err);
+    }
+
+    /**
+     * Handles the Output of a process and manage errors
+     *
+     * @param process The process
+     * @return The Output of the process
+     */
+    private String processOutputHandler(Process process) throws Throwable {
+        String res;
 
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))){
             StringBuilder resBuilder = new StringBuilder();
@@ -83,7 +184,7 @@ public class JavaPHP {
 
             while ((line = reader.readLine()) != null) resBuilder.append(line).append("\n");
 
-            this.response = resBuilder.toString();
+            res = resBuilder.toString();
         }
 
         try (BufferedReader errorReader = new BufferedReader(new InputStreamReader(process.getErrorStream()))){
@@ -98,34 +199,7 @@ public class JavaPHP {
                 if (!this.NO_PHP_WARN && (err.contains("PHP Warning:") || err.contains("PHP Startup:"))) onError(err);
             }
         }
-    }
 
-    /**
-     * Sets the function that will be called to handle the error instead of printing it into the console
-     * @param cb The function to be executed on error
-     */
-    public void setErrorCallback(Consumer<String> cb){
-        this.ERR_CALLBACK = cb;
-    }
-
-    /**
-     * Gets the result of the executed PHP file
-     * @return The result of the PHP file, returns null if no results
-     */
-    public String getResult(){
-        return this.response;
-    }
-
-    /**
-     * Error event listener, outputs error with System.err by default, to set custom error handler, use {@link #setErrorCallback}
-     * @param error The error
-     */
-    private void onError(String error){
-        if (this.ERR_CALLBACK == null) {
-            System.err.println(error);
-            return;
-        }
-
-        this.ERR_CALLBACK.accept(error);
+        return res;
     }
 }
