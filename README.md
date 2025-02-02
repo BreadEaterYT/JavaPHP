@@ -10,9 +10,6 @@ It can be used with Webservers (NanoHTTPD, Java socket, etc...) or as a part of 
 - PHP file / code execution in java
 - Customizable error handling
 
-### Planned features
-- PHP file / code execution over TCP/IP using PHP-CGI
-
 ### How to use
 Simply import it to your file and do like this:
 
