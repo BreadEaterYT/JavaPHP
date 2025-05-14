@@ -1,48 +1,73 @@
 ## JavaPHP
 
-JavaPHP is a lightweight Java library that permits to execute PHP code into Java so instead of using Java servlets,
-you can just use PHP and execute it as a part of your existing Java code, does not rely on any dependencies, its fully standalone,
-and you can use it in a compiled .jar file or in a simple .java file without having to compile it.
+JavaPHP is a lightweight Java library that permits to execute PHP code into Java, it does not rely on any dependencies and is fully standalone.
 
-It can be used with Webservers (NanoHTTPD, Java socket, etc...) or as a part of your Java app.
+It can be used with Webservers (NanoHTTPD, Java HttpServer, etc...) or as a part of a normal Java project.
 
-### Features
-- PHP file / code execution in java
-- Customizable error handling
-
-### Planned features
-- PHP file / code execution over TCP/IP using PHP-CGI
-
+- Execute PHP files from Java
+- Supports all HTTP methods and headers
+- Custom error handling via `Consumer<Exception>`
+- Compatible with PHP-FPM or `php-cgi` command
+- 
 ### How to use
-Simply import it to your file and do like this:
+- Import JavaPHP to your project.
+- If not using PHP FPM, start a PHP FastCGI server using:
+
+```text
+php-cgi -b 127.0.0.1:<port>
+```
+
+<strong>Warning:</strong> binding PHP-CGI or PHP-FPM to localhost is recommended for security reasons !
+
+- Run your PHP file in Java using this following example code:
 
 ```java
-import java.io.File;
-import java.util.HashMap;
-import java.util.Map;
+public class JavaPHPTest {
+    public static void main(String[] args){
+        JavaPHP javaphp = new JavaPHP(new InetSocketAddress("127.0.0.1", 7000)); // Create a JavaPHP instance with your PHP-CGI / PHP-FPM server address as parameter
+        Request request = new Request(); // Create a request instance to specify method, body, etc...
+        Headers headers = new Headers(); // Create a new Headers instance (if not already created), will be used to specify HTTP headers
 
-public class Main {
-    public static void main(String[] args) throws Throwable {
-        JavaPHP javaphp = new JavaPHP(false);
-        Map<String, String> env = new HashMap<>();
+        headers.add("Content-Type", "text/plain"); // Sets Content-Type to text/plain
 
-        env.put("REQUEST_METHOD", "GET");
+        request.setRequestMethod("POST"); // Sets request method to POST
+        request.setRequestPath("/");
+        request.setRequestBody("Hello World !"); // Sets 'Hello World !' as body
+        request.setRequestHttpVersion("HTTP/1.1");
+        request.setRequestAddress(new InetSocketAddress("127.0.0.1", 47829)); // The remote address (basically the user address)
+        request.setRequestHeaders(headers); // Gives the headers to the request instance
+        request.setIsHTTPS(false); // Sets HTTPS to false for example
 
-        javaphp.setErrorCallback((error) -> System.out.println("ERROR: " + error));
+        // Specifies the options that will be used when running a PHP file
+        // Note: The location of the PHP file is the same location as the PHP-CGI / PHP-FPM working directory, same for Document Root
+        JavaPHP.RunOptions options = new JavaPHP.RunOptions()
+                .setPHPDocumentRoot(new File("./").getAbsolutePath())
+                .setPHPFilepath(new File("./index.php").getAbsolutePath())
+                .setPHPServerSoftwareName("Java") // Sets the Server Software name (e.g Apache, Nginx, etc...)
+                .setPHPServerAddress("127.0.0.1") // The address where the HTTP server listen to
+                .setPHPServerPort(80); // The port where the HTTP server listen to
 
-        javaphp.setPHPVars(env);
-        javaphp.run(new File("./test.php").getAbsolutePath());
-        javaphp.runWithCli("echo 'Hello World !';");
+        // Handles error if a error occurs while running the PHP file
+        // In this case we just simply throw the error
+        javaphp.onError((err) -> {
+            try {
+                throw err;
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
 
-        System.out.println(javaphp.getResult());
-        System.out.println(javaphp.getInlineResult());
+        // Runs the PHP file and get the Response containing headers, body and status code given by PHP FastCGI
+        Response response = javaphp.run(options, request);
+
+        // Prints the results in the terminal
+        response.getResultHeaders().forEach((name, value) -> System.out.println(name + ": " + value.getFirst()));
+
+        System.out.println(response.getResultStatusCode());
+        System.out.println(response.getResultBody());
     }
 }
 ```
-
-### Installation
-Simply download the .jar / .java file from the repository Releases and import it in your project.<br>
-For Maven or Gradle, add it to your local repository.
 
 ### Contribution
 You can contribute as much as you want, contributors will be listed in the README.
