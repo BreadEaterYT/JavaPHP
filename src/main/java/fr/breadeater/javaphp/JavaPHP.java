@@ -109,27 +109,26 @@ public class JavaPHP {
             out.write(FastCGIUtils.buildParams(false, 1, fastCGIheaders));
             out.write(FastCGIUtils.buildParams(true, 1, fastCGIheaders));
             out.write(FastCGIUtils.buildStdin(1, reqbody));
+            out.write(FastCGIUtils.buildEmptyStdin(1));
 
-            String fastCGIresponse = FastCGIUtils.parseFastCGIRequest(in);
+            String fastCGIresponse = FastCGIUtils.parseFastCGIRequest(socket, in);
             String line;
 
             BufferedReader responseReader = new BufferedReader(new CharArrayReader(fastCGIresponse.toCharArray()));
             StringBuilder body = new StringBuilder();
             Headers headers = new Headers();
 
-            boolean parseBody = false;
-
             while ((line = responseReader.readLine()) != null){
-                if (line.isEmpty()) parseBody = true;
+                if (line.isEmpty()){
+                    String bodyLine;
 
-                if (!parseBody){
-                    String[] splitheader = line.split(": ", 2);
-
-                    headers.add(splitheader[0], splitheader[1]);
-                    continue;
+                    while ((bodyLine = responseReader.readLine()) != null) body.append(bodyLine).append("\r\n");
+                    break;
                 }
 
-                body.append(line).append("\r\n");
+                String[] splitheader = line.split(": ", 2);
+
+                headers.add(splitheader[0], splitheader[1]);
             }
 
             headers.forEach((name, value) -> {

@@ -2,6 +2,7 @@ package fr.breadeater.javaphp;
 
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
@@ -75,10 +76,10 @@ class FastCGIUtils {
         return buildRecord(Status.FCGI_BEGIN_REQUEST, requestId, body);
     }
 
-    public static String parseFastCGIRequest(InputStream in) throws Exception {
+    public static String parseFastCGIRequest(Socket client, InputStream in) throws Exception {
         String result = null;
 
-        while (true){
+        while (!client.isClosed()){
             int version = in.read();
             int type = in.read();
             int requestIdHigh = in.read();
@@ -96,8 +97,17 @@ class FastCGIUtils {
 
             if (padding > 0) in.skip(padding);
 
-            if (type == Status.FCGI_STDOUT.getRequestStatusCode() && contentLength > 0) result = new String(content, StandardCharsets.UTF_8);
-            if (type == Status.FCGI_END_REQUEST.getRequestStatusCode()) break;
+            if (type == Status.FCGI_STDOUT.getRequestStatusCode() && contentLength > 0){
+                result = new String(content, StandardCharsets.UTF_8);
+
+                client.close();
+                break;
+            }
+
+            if (type == Status.FCGI_END_REQUEST.getRequestStatusCode()){
+                client.close();
+                break;
+            }
         }
 
         return result;
