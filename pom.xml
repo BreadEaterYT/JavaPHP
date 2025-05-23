@@ -6,7 +6,7 @@
 
     <groupId>fr.breadeater</groupId>
     <artifactId>JavaPHP</artifactId>
-    <version>2.2.1</version>
+    <version>2.1.1</version>
 
     <properties>
         <maven.compiler.source>17</maven.compiler.source>
