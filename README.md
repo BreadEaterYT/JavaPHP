@@ -8,7 +8,7 @@ It can be used with Webservers (NanoHTTPD, Java HttpServer, etc...) or as a part
 - Supports all HTTP methods and headers
 - Custom error handling via `Consumer<Exception>`
 - Compatible with PHP-FPM or `php-cgi` command
-- 
+
 ### How to use
 - Import JavaPHP to your project.
 - If not using PHP FPM, start a PHP FastCGI server using:
