@@ -7,7 +7,7 @@ public class Response {
     protected Headers headers;
     protected String body;
 
-    public int getResultStatusCode(){ return this.statuscode; }
-    public Headers getResultHeaders(){ return this.headers; }
-    public String getResultBody(){ return this.body; }
+    public int getStatusCode(){ return this.statuscode; }
+    public Headers getHeaders(){ return this.headers; }
+    public String getBody(){ return this.body; }
 }

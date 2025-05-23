@@ -14,25 +14,7 @@ import java.net.InetSocketAddress;
 public class JavaPHPTest {
     public static void main(String[] args){
         JavaPHP javaphp = new JavaPHP(new InetSocketAddress("127.0.0.1", 7000));
-        Request request = new Request();
         Headers headers = new Headers();
-
-        headers.add("Content-Type", "text/plain");
-
-        request.setRequestMethod("POST");
-        request.setRequestPath("/");
-        request.setRequestBody("Hello World !");
-        request.setRequestHttpVersion("HTTP/1.1");
-        request.setRequestAddress(new InetSocketAddress("127.0.0.1", 47829));
-        request.setRequestHeaders(headers);
-        request.setIsHTTPS(false);
-
-        JavaPHP.RunOptions options = new JavaPHP.RunOptions()
-                .setPHPDocumentRoot(new File("./").getAbsolutePath())
-                .setPHPFilepath(new File("./index.php").getAbsolutePath())
-                .setPHPServerSoftwareName("Java")
-                .setPHPServerAddress("127.0.0.1")
-                .setPHPServerPort(80);
 
         javaphp.onError((err) -> {
             try {
@@ -42,11 +24,31 @@ public class JavaPHPTest {
             }
         });
 
+        // javaphp.useUnixSocket(true, new File("/run/php/php8.4-fpm.sock"));
+
+        headers.add("Content-Type", "text/plain");
+
+        Request request = new Request()
+                .setRequestMethod("POST")
+                .setRequestPath("/")
+                .setRequestBody("Hello World !")
+                .setRequestHttpVersion("HTTP/1.1")
+                .setRequestAddress(new InetSocketAddress("127.0.0.1", 47829))
+                .setRequestHeaders(headers)
+                .setHTTPS(false);
+
+        JavaPHP.Options options = new JavaPHP.Options()
+                .setPHPDocumentRoot(new File("./").getAbsolutePath())
+                .setPHPFilepath(new File("./index.php").getAbsolutePath())
+                .setPHPServerSoftwareName("Java")
+                .setPHPServerAddress("127.0.0.1")
+                .setPHPServerPort(80);
+
         Response response = javaphp.run(options, request);
 
-        response.getResultHeaders().forEach((name, value) -> System.out.println(name + ": " + value.getFirst()));
+        response.getHeaders().forEach((name, value) -> System.out.println(name + ": " + value.get(0)));
 
-        System.out.println(response.getResultStatusCode());
-        System.out.println(response.getResultBody());
+        System.out.println(response.getStatusCode());
+        System.out.println(response.getBody());
     }
 }

@@ -9,7 +9,7 @@ If you have skills in Java you can contribute as much as you want !
 
 ### Get Started
 - Fork the repository
-- Do what you want add or modify
+- Do what you want to add or modify
 - Do a Pull Request
 
 Note: Modifications of Markdown files, LICENSE, or any files that aren't code does not count !

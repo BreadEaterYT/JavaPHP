@@ -3,16 +3,22 @@ package fr.breadeater.javaphp;
 import com.sun.net.httpserver.Headers;
 
 import java.io.*;
-import java.net.InetSocketAddress;
-import java.net.Socket;
-import java.util.HashMap;
-import java.util.List;
+import java.net.*;
+import java.nio.channels.Channels;
+import java.nio.channels.SocketChannel;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Consumer;
+import java.util.regex.Pattern;
 
 public class JavaPHP {
     private Consumer<Exception> onError = null;
     private InetSocketAddress address;
+
+
+    private boolean useUnixSocket = false;
+    private File unixSocketFile;
+
 
     /**
      * Creates a new JavaPHP instance.
@@ -28,6 +34,33 @@ public class JavaPHP {
         this.address = address;
     }
 
+
+    /**
+     * Uses Unix Socket instead of TCP/IP for running PHP files with FastCGI
+     *
+     * @implNote <strong>Note:</strong> This only works on Linux/WSL using root, won't work under Windows !
+     *
+     * @param unixSocket Should the Unix Socket be used instead of TCP/IP to run PHP files.<br>
+     * @param unixSocketFile The file pointing to the Unix Socket (e.g /run/php/php8.4-fpm.sock or /run/php/php8-fpm.sock).<br>
+     */
+    public void useUnixSocket(boolean unixSocket, File unixSocketFile){
+        try {
+            String osname = System.getProperty("os.name").toLowerCase();
+            String user = System.getProperty("user.name");
+
+            if (!osname.contains("linux")) throw new UnsupportedOperationException("Unix Socket cannot be used on other Operating Systems than Linux/WSL !");
+            if (!user.equals("root")) throw new IllegalAccessException("Unix Socket requires root privileges !");
+
+            this.unixSocketFile = unixSocketFile;
+            this.useUnixSocket = unixSocket;
+        } catch (Exception error){
+            if (this.onError != null){
+                this.onError.accept(error);
+            } else throw new RuntimeException(error);
+        }
+    }
+
+
     /**
      * Sets a {@link Consumer} function to execute when an error is being thrown.
      *
@@ -37,69 +70,41 @@ public class JavaPHP {
         this.onError = callback;
     }
 
+
     /**
      * Runs a PHP file on the PHP FastCGI server and returns result.
      *
      * @param runOptions Options to use when running an PHP file, basically specifies FastCGI params (e.g <code>$_SERVER["REMOTE_ADDR"]</code>)
      * @param request An instance of {@link Request} containing Headers, Body, etc...
      */
-    public Response run(RunOptions runOptions, Request request){
-        Socket socket = new Socket();
+    public Response run(Options runOptions, Request request){
         Response response = new Response();
+        ProtocolFamily protocol = StandardProtocolFamily.INET;
+        SocketAddress address = this.address;
 
-        if (runOptions == null) throw new IllegalArgumentException("runOptions must not be null !");
-        if (request == null) throw new IllegalArgumentException("request must not be null !");
+        if (this.useUnixSocket){
+            if (this.unixSocketFile.exists() && this.validatePHPUnixSocketPath(this.unixSocketFile)){
+
+                address = UnixDomainSocketAddress.of(this.unixSocketFile.toPath());
+                protocol = StandardProtocolFamily.UNIX;
+
+            } else {
+                throw new IllegalArgumentException("Unix Socket path is invalid or does not exists (file name must be formatted like this: phpX.X-fpm.sock) !");
+            }
+        }
+
+        Objects.requireNonNull(address);
+        Objects.requireNonNull(runOptions);
+        Objects.requireNonNull(request);
 
         try {
-            socket.connect(this.address);
+            SocketChannel socket = SocketChannel.open(protocol);
 
-            OutputStream out = socket.getOutputStream();
-            InputStream in = socket.getInputStream();
+            socket.connect(address);
 
-            Map<String, String> fastCGIheaders = new HashMap<>();
-            Headers reqHeaders = request.getRequestHeaders();
-            String httpsEnabled = "off";
-
-            if (request.isHttps()) httpsEnabled = "on";
-
-            String[] splittedURI = request.getRequestPath().split("\\?", 2);
-
-            if (splittedURI.length == 2) fastCGIheaders.put("QUERY_STRING", splittedURI[1]);
-
-            fastCGIheaders.put("SCRIPT_FILENAME", runOptions.PHP_FILEPATH);
-            fastCGIheaders.put("GATEWAY_INTERFACE", "CGI/1.1");
-            fastCGIheaders.put("SERVER_PROTOCOL", request.getRequestHttpVersion());
-            fastCGIheaders.put("REQUEST_METHOD", request.getRequestMethod());
-            fastCGIheaders.put("SCRIPT_NAME", splittedURI[0]);
-            fastCGIheaders.put("REQUEST_URI", request.getRequestPath());
-            fastCGIheaders.put("DOCUMENT_ROOT", runOptions.PHP_DOC_ROOT);
-            fastCGIheaders.put("SERVER_SOFTWARE", runOptions.PHP_SERVERSOFTWARE);
-            fastCGIheaders.put("REMOTE_ADDR", request.getRequestAddress().getHostName());
-            fastCGIheaders.put("REMOTE_PORT", Integer.toString(request.getRequestAddress().getPort()));
-            fastCGIheaders.put("SERVER_ADDR", runOptions.PHP_SERVERADDR);
-            fastCGIheaders.put("SERVER_PORT", Integer.toString(runOptions.PHP_SERVERPORT));
-            fastCGIheaders.put("HTTPS", httpsEnabled);
-
-            for (Map.Entry<String, List<String>> entry : reqHeaders.entrySet()){
-                String key = entry.getKey();
-                String value = entry.getValue().getFirst();
-
-                if (key.equals("Content-Length")) continue;
-
-                if (key.equals("Content-Type")){
-                    fastCGIheaders.put("CONTENT_TYPE", value);
-                    continue;
-                }
-
-                if (request.getRequestBody() != null){
-                    int reqBodyLength = request.getRequestBody().getBytes().length;
-
-                    fastCGIheaders.put("CONTENT_LENGTH", Integer.toString(reqBodyLength));
-                    continue;
-                }
-
-                fastCGIheaders.put("HTTP_" + key.replaceAll("-", "_").toUpperCase(), value);
-            }
+            Map<String, String> fastCGIheaders = FastCGIUtils.setFastCGIParams(runOptions, request);
+            OutputStream out = Channels.newOutputStream(socket);
+            InputStream in = Channels.newInputStream(socket);
 
             byte[] reqbody = new byte[0];
 
@@ -133,7 +138,7 @@ public class JavaPHP {
 
             headers.forEach((name, value) -> {
                 if (name.equals("Status")){
-                    String[] splitStatus = value.getFirst().split(" ");
+                    String[] splitStatus = value.get(0).split(" ");
 
                     response.statuscode = Integer.parseInt(splitStatus[0]);
                 }
@@ -152,20 +157,36 @@ public class JavaPHP {
         return response;
     }
 
-    /**
-     * RunOptions specifies the options to be used when running an PHP file, this is used to specify predefined variables (DOCUMENT_ROOT, SERVERADDR, etc...)
-     */
-    public static class RunOptions {
-        private String PHP_FILEPATH;
-        private String PHP_DOC_ROOT;
-        private String PHP_SERVERADDR;
-        private String PHP_SERVERSOFTWARE;
-        private int PHP_SERVERPORT;
 
-        public RunOptions setPHPDocumentRoot(String php_docroot){ this.PHP_DOC_ROOT = php_docroot; return this; }
-        public RunOptions setPHPFilepath(String php_filepath){ this.PHP_FILEPATH = php_filepath; return this; }
-        public RunOptions setPHPServerAddress(String php_serveraddr){ this.PHP_SERVERADDR = php_serveraddr; return this; }
-        public RunOptions setPHPServerPort(int php_serverport){ this.PHP_SERVERPORT = php_serverport; return this; }
-        public RunOptions setPHPServerSoftwareName(String php_serversoftware){ this.PHP_SERVERSOFTWARE = php_serversoftware; return this; }
+    /**
+     * Checks if the Unix Socket file exists and if the filename of the PHP Unix Socket ends is formatted correctly (phpX-fpm.sock or phpX.X-fpm.sock).
+     * @param file The file to be checked.
+     * @return True / False depending on if the filename is correctly formatted and if the Unix Socket file exists.
+     */
+    private boolean validatePHPUnixSocketPath(File file){
+        final Pattern SOCKET_PATTERN = Pattern.compile("^php\\d+(\\.\\d+)?-fpm\\.sock$");
+
+        if (file == null) return false;
+        if (!file.exists()) return false;
+
+        return SOCKET_PATTERN.matcher(file.getName()).matches();
+    }
+
+
+    /**
+     * Options specifies the options to be used when running an PHP file, this is used to specify predefined variables (DOCUMENT_ROOT, SERVERADDR, etc...)
+     */
+    public static class Options {
+        String PHP_FILEPATH;
+        String PHP_DOC_ROOT;
+        String PHP_SERVERADDR;
+        String PHP_SERVERSOFTWARE;
+        int PHP_SERVERPORT;
+
+        public Options setPHPDocumentRoot(String php_docroot){ this.PHP_DOC_ROOT = php_docroot; return this; }
+        public Options setPHPFilepath(String php_filepath){ this.PHP_FILEPATH = php_filepath; return this; }
+        public Options setPHPServerAddress(String php_serveraddr){ this.PHP_SERVERADDR = php_serveraddr; return this; }
+        public Options setPHPServerPort(int php_serverport){ this.PHP_SERVERPORT = php_serverport; return this; }
+        public Options setPHPServerSoftwareName(String php_serversoftware){ this.PHP_SERVERSOFTWARE = php_serversoftware; return this; }
     }
 }

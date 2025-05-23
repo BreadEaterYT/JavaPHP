@@ -20,7 +20,7 @@ public class Request {
     public Request setRequestAddress(InetSocketAddress address){ this.address = address; return this; }
     public Request setRequestPath(String path){ this.path = path; return this; }
     public Request setRequestMethod(String method){ this.method = method; return this; }
-    public Request setIsHTTPS(boolean isHTTPS){ this.https = isHTTPS; return this; }
+    public Request setHTTPS(boolean isHTTPS){ this.https = isHTTPS; return this; }
 
     public String getRequestHttpVersion(){ return this.httpVersion; }
     public String getRequestBody(){ return this.body; }
