@@ -10,7 +10,25 @@ It can be used with Webservers (NanoHTTPD, Java HttpServer, etc...) or as a part
 - Compatible with PHP-FPM or `php-cgi` command
 
 ### How to use
-- Import JavaPHP to your project.
+- Download the source code and build it and import it OR import it directly from my maven repository like this:
+
+```xml
+<repositories>
+    <repository>
+        <id>breadeatercdn</id>
+        <url>https://cdn.breadeater.fr/maven</url>
+    </repository>
+</repositories>
+
+<dependencies>
+    <dependency>
+        <groupId>fr.breadeater</groupId>
+        <artifactId>javaphp</artifactId>
+        <version>2.1.1</version>
+    </dependency>
+</dependencies>
+```
+
 - If not using PHP FPM, start a PHP FastCGI server using:
 
 ```text
