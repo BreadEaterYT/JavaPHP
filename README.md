@@ -10,7 +10,7 @@ It can be used with Webservers (NanoHTTPD, Java HttpServer, etc...) or as a part
 - Compatible with PHP-FPM or `php-cgi` command
 
 ### How to use
-- Download the source code and build it and import it OR import it directly from my maven repository like this:
+- Download the source code and build it and import it <strong>OR</strong> import it directly from my maven repository like this:
 
 ```xml
 <repositories>
