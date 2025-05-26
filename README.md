@@ -58,7 +58,7 @@ public class JavaPHPTest {
 
         // Specifies the options that will be used when running a PHP file
         // Note: The location of the PHP file is the same location as the PHP-CGI / PHP-FPM working directory, same for Document Root
-        JavaPHP.RunOptions options = new JavaPHP.RunOptions()
+        JavaPHP.Options options = new JavaPHP.Options()
                 .setPHPDocumentRoot(new File("./").getAbsolutePath())
                 .setPHPFilepath(new File("./index.php").getAbsolutePath())
                 .setPHPServerSoftwareName("Java") // Sets the Server Software name (e.g Apache, Nginx, etc...)
