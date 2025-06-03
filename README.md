@@ -8,9 +8,27 @@ It can be used with Webservers (NanoHTTPD, Java HttpServer, etc...) or as a part
 - Supports all HTTP methods and headers
 - Custom error handling via `Consumer<Exception>`
 - Compatible with PHP-FPM or `php-cgi` command
-- 
+
 ### How to use
-- Import JavaPHP to your project.
+- Download the source code and build it and import it <strong>OR</strong> import it directly from my maven repository like this:
+
+```xml
+<repositories>
+    <repository>
+        <id>breadeatercdn</id>
+        <url>https://cdn.breadeater.fr/maven</url>
+    </repository>
+</repositories>
+
+<dependencies>
+    <dependency>
+        <groupId>fr.breadeater</groupId>
+        <artifactId>javaphp</artifactId>
+        <version>2.1.1</version>
+    </dependency>
+</dependencies>
+```
+
 - If not using PHP FPM, start a PHP FastCGI server using:
 
 ```text
@@ -40,7 +58,7 @@ public class JavaPHPTest {
 
         // Specifies the options that will be used when running a PHP file
         // Note: The location of the PHP file is the same location as the PHP-CGI / PHP-FPM working directory, same for Document Root
-        JavaPHP.RunOptions options = new JavaPHP.RunOptions()
+        JavaPHP.Options options = new JavaPHP.Options()
                 .setPHPDocumentRoot(new File("./").getAbsolutePath())
                 .setPHPFilepath(new File("./index.php").getAbsolutePath())
                 .setPHPServerSoftwareName("Java") // Sets the Server Software name (e.g Apache, Nginx, etc...)
