@@ -2,33 +2,34 @@ package fr.breadeater.javaphp;
 
 import com.sun.net.httpserver.Headers;
 
-import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
+import java.io.*;
 import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
-class FastCGIUtils {
+class JavaPHPUtils {
     /**
      * Builds record and returns it
-     * @param type The record type
-     * @param requestId The request ID
+     *
+     * @param type    The record type
      * @param content The content
      * @return The built record
      */
-    static byte[] buildRecord(Status type, int requestId, byte[] content){
+    protected static byte[] buildRecord(int type, byte[] content){
         int length = content.length;
         int padding = (8 - (length % 8)) % 8;
 
         ByteBuffer buffer = ByteBuffer.allocate(8 + length + padding);
 
-        buffer.put((byte) Status.FCGI_VERSION.getRequestStatusCode());
-        buffer.put((byte) type.getRequestStatusCode());
+        buffer.put((byte) 1);
+        buffer.put((byte) type);
 
-        buffer.putShort((short) requestId);
+        buffer.putShort((short) 1);
         buffer.putShort((short) length);
 
         buffer.put((byte) padding);
@@ -46,7 +47,7 @@ class FastCGIUtils {
      * @param length The length to be encoded.
      * @return A byte array containing the encoded length
      */
-    static byte[] encodeLength(int length){
+    protected static byte[] encodeLength(int length){
         if (length < 128) return new byte[]{ (byte) length };
 
         return new byte[]{
@@ -60,14 +61,14 @@ class FastCGIUtils {
 
     /**
      * Build params and sends them to FastCGI server
-     * @param empty Should it sends Empty Params
-     * @param requestId
+     *
+     * @param empty  Should it sends Empty Params
      * @param params
      * @return
      * @throws Exception
      */
-    static byte[] buildParams(boolean empty, int requestId, Map<String, String> params) throws Exception {
-        if (empty) return buildRecord(Status.FCGI_PARAMS, requestId, new byte[0]);
+    protected static ByteBuffer buildParams(boolean empty, Map<String, String> params) throws Exception {
+        if (empty) return ByteBuffer.wrap(buildRecord(4, new byte[0]));
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
 
@@ -83,55 +84,45 @@ class FastCGIUtils {
             out.write(value.getBytes(StandardCharsets.UTF_8));
         }
 
-        return buildRecord(Status.FCGI_PARAMS, requestId, out.toByteArray());
-    }
-
-
-    /**
-     * Builds stdin containing a byte array and returns it
-     * @param requestId The request ID
-     * @param body
-     * @return The built stdin
-     */
-    static byte[] buildStdin(int requestId, byte[] body){
-        return buildRecord(Status.FCGI_STDIN, requestId, body);
-    }
-
-
-    /**
-     * Builds a empty stdin and returns it
-     * @param requestId The request ID
-     * @return The built stdin
-     */
-    static byte[] buildEmptyStdin(int requestId){
-        return buildRecord(Status.FCGI_STDIN, requestId, new byte[0]);
+        return ByteBuffer.wrap(buildRecord(4, out.toByteArray()));
     }
 
 
     /**
      * Builds request and returns it
-     * @param requestId The request ID
+     *
      * @return The request
      */
-    static byte[] buildRequest(int requestId){
+    protected static ByteBuffer buildRequest(){
         byte[] body = new byte[8];
 
         body[0] = 0;
-        body[1] = (byte) Status.FCGI_RESPONDER.getRequestStatusCode();
+        body[1] = (byte) 1;
         body[2] = 0;
 
-        return buildRecord(Status.FCGI_BEGIN_REQUEST, requestId, body);
+        return ByteBuffer.wrap(buildRecord(1, body));
+    }
+
+
+    /**
+     * Builds stdin and returns it
+     *
+     * @param content The content
+     */
+    protected static ByteBuffer buildStdin(byte[] content){
+        return ByteBuffer.wrap(buildRecord(5, content));
     }
 
 
     /**
      * Parses the FastCGI response and return its body
      * @param client The client socket
-     * @param in The input stream of the client
      * @return The body of the response
      */
-    static String parseFastCGIRequest(SocketChannel client, InputStream in) throws Exception {
-        String result = null;
+    protected static BufferedReader parseFastCGIRequest(SocketChannel client) throws Exception {
+        String result = "";
+
+        InputStream in = Channels.newInputStream(client);
 
         while (client.isOpen()){
             int version = in.read();
@@ -151,20 +142,20 @@ class FastCGIUtils {
 
             if (padding > 0) in.skip(padding);
 
-            if (type == Status.FCGI_STDOUT.getRequestStatusCode() && contentLength > 0){
+            if (type == 6 && contentLength > 0){
                 result = new String(content, StandardCharsets.UTF_8);
 
                 client.close();
                 break;
             }
 
-            if (type == Status.FCGI_END_REQUEST.getRequestStatusCode()){
+            if (type == 3){
                 client.close();
                 break;
             }
         }
 
-        return result;
+        return new BufferedReader(new CharArrayReader(result.toCharArray()));
     }
 
 
@@ -174,26 +165,26 @@ class FastCGIUtils {
      * @param request An Http Request instance containing request method, request headers, etc...
      * @return The Map containing all the params
      */
-    static Map<String, String> setFastCGIParams(JavaPHP.Options runOptions, Request request) {
+    protected static Map<String, String> setFastCGIParams(JavaPHP.Options runOptions, Request request) {
         Map<String, String> fastCGIheaders = new HashMap<>();
-        Headers reqHeaders = request.getRequestHeaders();
+        Headers reqHeaders = request.headers;
         String httpsEnabled = "off";
 
-        String[] splittedURI = request.getRequestPath().split("\\?", 2);
+        String[] splittedURI = request.path.split("\\?", 2);
 
         if (splittedURI.length == 2) fastCGIheaders.put("QUERY_STRING", splittedURI[1]);
-        if (request.isHttps()) httpsEnabled = "on";
+        if (request.https) httpsEnabled = "on";
 
         fastCGIheaders.put("SCRIPT_FILENAME", runOptions.PHP_FILEPATH);
         fastCGIheaders.put("GATEWAY_INTERFACE", "CGI/1.1");
-        fastCGIheaders.put("SERVER_PROTOCOL", request.getRequestHttpVersion());
-        fastCGIheaders.put("REQUEST_METHOD", request.getRequestMethod());
+        fastCGIheaders.put("SERVER_PROTOCOL", request.httpVersion);
+        fastCGIheaders.put("REQUEST_METHOD", request.method);
         fastCGIheaders.put("SCRIPT_NAME", splittedURI[0]);
-        fastCGIheaders.put("REQUEST_URI", request.getRequestPath());
+        fastCGIheaders.put("REQUEST_URI", request.path);
         fastCGIheaders.put("DOCUMENT_ROOT", runOptions.PHP_DOC_ROOT);
         fastCGIheaders.put("SERVER_SOFTWARE", runOptions.PHP_SERVERSOFTWARE);
-        fastCGIheaders.put("REMOTE_ADDR", request.getRequestAddress().getHostName());
-        fastCGIheaders.put("REMOTE_PORT", Integer.toString(request.getRequestAddress().getPort()));
+        fastCGIheaders.put("REMOTE_ADDR", request.address.getHostName());
+        fastCGIheaders.put("REMOTE_PORT", Integer.toString(request.address.getPort()));
         fastCGIheaders.put("SERVER_ADDR", runOptions.PHP_SERVERADDR);
         fastCGIheaders.put("SERVER_PORT", Integer.toString(runOptions.PHP_SERVERPORT));
         fastCGIheaders.put("HTTPS", httpsEnabled);
@@ -209,8 +200,8 @@ class FastCGIUtils {
                 continue;
             }
 
-            if (request.getRequestBody() != null){
-                int reqBodyLength = request.getRequestBody().getBytes().length;
+            if (request.body != null){
+                int reqBodyLength = request.body.getBytes().length;
 
                 fastCGIheaders.put("CONTENT_LENGTH", Integer.toString(reqBodyLength));
                 continue;
@@ -220,5 +211,38 @@ class FastCGIUtils {
         }
 
         return fastCGIheaders;
+    }
+
+    protected static Response parseResponse(BufferedReader reader) throws IOException {
+        StringBuilder body = new StringBuilder();
+        Headers headers = new Headers();
+        AtomicInteger status = new AtomicInteger(200);
+
+        String line;
+
+        while ((line = reader.readLine()) != null){
+            if (line.isEmpty()){
+                String bodyLine;
+
+                while ((bodyLine = reader.readLine()) != null) body.append(bodyLine).append("\r\n");
+                break;
+            }
+
+            String[] splitheader = line.split(": ", 2);
+
+            headers.add(splitheader[0], splitheader[1]);
+        }
+
+        headers.forEach((name, value) -> {
+            if (name.equals("Status")){
+                String[] splitStatus = value.get(0).split(" ");
+
+                status.set(Integer.parseInt(splitStatus[0]));
+            }
+        });
+
+        headers.remove("Status");
+
+        return new Response(headers, body.toString(), status.get());
     }
 }

@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>fr.breadeater</groupId>
-    <artifactId>JavaPHP</artifactId>
+    <artifactId>javaphp</artifactId>
     <version>2.2.1</version>
 
     <properties>
@@ -16,9 +16,9 @@
 
     <distributionManagement>
         <repository>
-            <id>github</id>
-            <name>GitHub Packages</name>
-            <url>https://maven.pkg.github.com/BreadEaterYT/JavaPHP</url>
+            <id>cdnmaven</id>
+            <name>BreadEaterCDN Maven</name>
+            <url>https://cdn.breadeater.fr/maven</url>
         </repository>
     </distributionManagement>
 

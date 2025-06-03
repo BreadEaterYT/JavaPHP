@@ -1,18 +1,18 @@
 package fr.breadeater.javaphp;
 
-import com.sun.net.httpserver.Headers;
+import com.sun.net.httpserver.*;
 
 import java.net.InetSocketAddress;
 
 public class Request {
-    private InetSocketAddress address;
-    private Headers headers;
-    private String httpVersion;
-    private String method;
-    private String path;
-    private String body;
+    protected InetSocketAddress address;
+    protected Headers headers;
+    protected String httpVersion;
+    protected String method;
+    protected String path;
+    protected String body;
 
-    private boolean https;
+    protected boolean https;
 
     public Request setRequestHttpVersion(String httpVersion){ this.httpVersion = httpVersion; return this; }
     public Request setRequestBody(String requestBody){ this.body = requestBody; return this; }
@@ -22,12 +22,51 @@ public class Request {
     public Request setRequestMethod(String method){ this.method = method; return this; }
     public Request setHTTPS(boolean isHTTPS){ this.https = isHTTPS; return this; }
 
-    public String getRequestHttpVersion(){ return this.httpVersion; }
-    public String getRequestBody(){ return this.body; }
-    public Headers getRequestHeaders(){ return this.headers; }
-    public InetSocketAddress getRequestAddress(){ return this.address; }
-    public String getRequestMethod(){ return this.method; }
-    public String getRequestPath(){ return this.path; }
+    /**
+     * Creates a {@link Request} instance based on {@link HttpExchange}
+     * @param exchange The {@link HttpExchange} of an Http Request of Java {@link HttpServer}
+     * @return A new a {@link Request} instance containing datas of {@link HttpExchange}
+     */
+    public static Request parseExchange(HttpExchange exchange){
+        Request request = new Request();
 
-    public boolean isHttps(){ return this.https; }
+        try {
+            request.address = exchange.getRemoteAddress();
+            request.headers = exchange.getRequestHeaders();
+            request.httpVersion = exchange.getProtocol();
+            request.method = exchange.getRequestMethod();
+            request.path = exchange.getRequestURI().getPath();
+            request.body = new String(exchange.getRequestBody().readAllBytes());
+
+            request.https = false;
+        } catch (Exception err){
+            throw new RuntimeException(err);
+        }
+
+        return request;
+    }
+
+    /**
+     * Creates a {@link Request} instance based on {@link HttpsExchange}
+     * @param exchange The {@link HttpsExchange} of an Http Request of Java {@link HttpsServer}
+     * @return A new a {@link Request} instance containing datas of {@link HttpsExchange}
+     */
+    public static Request parseExchange(HttpsExchange exchange){
+        Request request = new Request();
+
+        try {
+            request.address = exchange.getRemoteAddress();
+            request.headers = exchange.getRequestHeaders();
+            request.httpVersion = exchange.getProtocol();
+            request.method = exchange.getRequestMethod();
+            request.path = exchange.getRequestURI().getPath();
+            request.body = new String(exchange.getRequestBody().readAllBytes());
+
+            request.https = true;
+        } catch (Exception err){
+            throw new RuntimeException(err);
+        }
+
+        return request;
+    }
 }

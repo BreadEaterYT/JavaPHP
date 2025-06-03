@@ -1,23 +1,21 @@
 package fr.breadeater.javaphp;
 
-import com.sun.net.httpserver.Headers;
-
 import java.io.*;
 import java.net.*;
-import java.nio.channels.Channels;
 import java.nio.channels.SocketChannel;
 import java.util.Map;
-import java.util.Objects;
+import java.util.concurrent.*;
 import java.util.function.Consumer;
-import java.util.regex.Pattern;
 
 public class JavaPHP {
+    private static ExecutorService threadPool = Executors.newCachedThreadPool();
+
+    private SocketChannel socketChannel;
     private Consumer<Exception> onError = null;
     private InetSocketAddress address;
-
-
-    private boolean useUnixSocket = false;
     private File unixSocketFile;
+
+    private boolean useThreadPool = false;
 
 
     /**
@@ -25,45 +23,59 @@ public class JavaPHP {
      *
      * <p>JavaPHP communicates with a PHP FastCGI / PHP FPM server over TCP socket.</p>
      *
-     * @param address The {@link InetSocketAddress} of the PHP FastCGI / PHP FPM server. {@link InetSocketAddress} with 127.0.0.1 as hostname is <strong>STRONGLY</strong> recommended.
+     * @param address The {@link InetSocketAddress} of the PHP FastCGI / PHP-FPM server. {@link InetSocketAddress} with 127.0.0.1 as hostname is <strong>STRONGLY</strong> recommended.
      *
-     * @implNote <strong>Note:</strong> Unix sockets are not supported. Make sure you start a PHP FastCGI / PHP FPM server (e.g., using <code>php-cgi -b 127.0.0.1:PORT</code> or use PHP FPM server)
+     * @implNote <strong>Note:</strong> Make sure you start a PHP FastCGI / PHP FPM server (e.g., using <code>php-cgi -b 127.0.0.1:PORT</code> or use PHP FPM server)
      * and bind it to <code>localhost</code> to avoid exposing it to external connections.
      */
-    public JavaPHP(InetSocketAddress address){
+    public JavaPHP(InetSocketAddress address) throws Exception {
+        this.socketChannel = SocketChannel.open(StandardProtocolFamily.INET);
         this.address = address;
     }
 
 
     /**
-     * Uses Unix Socket instead of TCP/IP for running PHP files with FastCGI
+     * Should this JavaPHP instance use a Thread Pool to run PHP scripts ?
      *
-     * @implNote <strong>Note:</strong> This only works on Linux/WSL using root, won't work under Windows !
+     * @param useThreadPool Enable / Disable the usage of a Thread Pool by this instance of JavaPHP.
      *
-     * @param unixSocket Should the Unix Socket be used instead of TCP/IP to run PHP files.<br>
-     * @param unixSocketFile The file pointing to the Unix Socket (e.g /run/php/php8.4-fpm.sock or /run/php/php8-fpm.sock).<br>
+     * @apiNote <strong>Note: </strong> By default: the thread pool is a {@link Executors#newCachedThreadPool()}, to change it, use {@link #setThreadPool(ExecutorService threadPool)} function.
      */
-    public void useUnixSocket(boolean unixSocket, File unixSocketFile){
-        try {
-            String osname = System.getProperty("os.name").toLowerCase();
-            String user = System.getProperty("user.name");
+    public void useThreadPool(boolean useThreadPool){
+        this.useThreadPool = useThreadPool;
+    }
 
-            if (!osname.contains("linux")) throw new UnsupportedOperationException("Unix Socket cannot be used on other Operating Systems than Linux/WSL !");
-            if (!user.equals("root")) throw new IllegalAccessException("Unix Socket requires root privileges !");
 
-            this.unixSocketFile = unixSocketFile;
-            this.useUnixSocket = unixSocket;
-        } catch (Exception error){
-            if (this.onError != null){
-                this.onError.accept(error);
-            } else throw new RuntimeException(error);
-        }
+    /**
+     * Sets a new Thread Pool that all JavaPHP instances can use.
+     * @param threadPool The Thread Pool to use.
+     */
+    public void setThreadPool(ExecutorService threadPool){
+        JavaPHP.threadPool = threadPool;
+    }
+
+
+    /**
+     * Uses Unix Socket instead of TCP/IP to communicate with PHP FastCGI (Linux only)
+     * @param unixSocketFile The Unix Socket file to use.
+     * @throws IllegalAccessException If the current user is not root.
+     * @throws UnsupportedOperationException If the current OS is not Linux.
+     * @throws IOException If an error happens when openning the {@link SocketChannel}.
+     */
+    public void useUnixSocket(File unixSocketFile) throws IllegalAccessException, IOException {
+        String osname = System.getProperty("os.name").toLowerCase();
+        String user = System.getProperty("user.name");
+
+        if (!osname.contains("linux")) throw new UnsupportedOperationException("Unix Socket cannot be used on other Operating Systems than Linux/WSL !");
+        if (!user.equals("root")) throw new IllegalAccessException("Unix Socket requires root privileges !");
+
+        this.socketChannel = SocketChannel.open(StandardProtocolFamily.UNIX);
+        this.unixSocketFile = unixSocketFile;
     }
 
 
     /**
      * Sets a {@link Consumer} function to execute when an error is being thrown.
-     *
      * @param callback The function to be executed if an error is thrown.
      */
     public void onError(Consumer<Exception> callback){
@@ -74,102 +86,42 @@ public class JavaPHP {
     /**
      * Runs a PHP file on the PHP FastCGI server and returns result.
      *
-     * @param runOptions Options to use when running an PHP file, basically specifies FastCGI params (e.g <code>$_SERVER["REMOTE_ADDR"]</code>)
+     * @param options Options to use when running an PHP file, basically specifies FastCGI params (e.g: REMOTE_ADDR, HTTPS, etc...)
      * @param request An instance of {@link Request} containing Headers, Body, etc...
      */
-    public Response run(Options runOptions, Request request){
-        Response response = new Response();
-        ProtocolFamily protocol = StandardProtocolFamily.INET;
-        SocketAddress address = this.address;
+    public Response run(Options options, Request request) throws Exception {
+        Callable<Response> runLogic = () -> {
+            try {
+                Map<String, String> fastCGIheaders = JavaPHPUtils.setFastCGIParams(options, request);
+                String reqbody = "";
 
-        if (this.useUnixSocket){
-            if (this.unixSocketFile.exists() && this.validatePHPUnixSocketPath(this.unixSocketFile)){
+                if (request.body != null) reqbody = request.body;
 
-                address = UnixDomainSocketAddress.of(this.unixSocketFile.toPath());
-                protocol = StandardProtocolFamily.UNIX;
+                if (this.unixSocketFile != null){
+                    if (!this.unixSocketFile.exists()) throw new IllegalArgumentException("Unix Socket path is invalid or does not exists (file name must be formatted like this: phpX.X-fpm.sock) !");
 
-            } else {
-                throw new IllegalArgumentException("Unix Socket path is invalid or does not exists (file name must be formatted like this: phpX.X-fpm.sock) !");
+                    this.socketChannel.connect(UnixDomainSocketAddress.of(this.unixSocketFile.getCanonicalPath()));
+                } else this.socketChannel.connect(this.address);
+
+                this.socketChannel.write(JavaPHPUtils.buildRequest());
+                this.socketChannel.write(JavaPHPUtils.buildParams(false, fastCGIheaders));
+                this.socketChannel.write(JavaPHPUtils.buildParams(true, fastCGIheaders));
+                this.socketChannel.write(JavaPHPUtils.buildStdin(reqbody.getBytes()));
+                this.socketChannel.write(JavaPHPUtils.buildStdin(new byte[0]));
+
+                BufferedReader responseReader = JavaPHPUtils.parseFastCGIRequest(this.socketChannel);
+
+                return JavaPHPUtils.parseResponse(responseReader);
+            } catch (Exception err){
+                if (this.onError != null) this.onError.accept(err);
+
+                return null;
             }
-        }
+        };
 
-        Objects.requireNonNull(address);
-        Objects.requireNonNull(runOptions);
-        Objects.requireNonNull(request);
-
-        try {
-            SocketChannel socket = SocketChannel.open(protocol);
-
-            socket.connect(address);
-
-            Map<String, String> fastCGIheaders = FastCGIUtils.setFastCGIParams(runOptions, request);
-            OutputStream out = Channels.newOutputStream(socket);
-            InputStream in = Channels.newInputStream(socket);
-
-            byte[] reqbody = new byte[0];
-
-            if (request.getRequestBody() != null) reqbody = request.getRequestBody().getBytes();
-
-            out.write(FastCGIUtils.buildRequest(1));
-            out.write(FastCGIUtils.buildParams(false, 1, fastCGIheaders));
-            out.write(FastCGIUtils.buildParams(true, 1, fastCGIheaders));
-            out.write(FastCGIUtils.buildStdin(1, reqbody));
-            out.write(FastCGIUtils.buildEmptyStdin(1));
-
-            String fastCGIresponse = FastCGIUtils.parseFastCGIRequest(socket, in);
-            String line;
-
-            BufferedReader responseReader = new BufferedReader(new CharArrayReader(fastCGIresponse.toCharArray()));
-            StringBuilder body = new StringBuilder();
-            Headers headers = new Headers();
-
-            while ((line = responseReader.readLine()) != null){
-                if (line.isEmpty()){
-                    String bodyLine;
-
-                    while ((bodyLine = responseReader.readLine()) != null) body.append(bodyLine).append("\r\n");
-                    break;
-                }
-
-                String[] splitheader = line.split(": ", 2);
-
-                headers.add(splitheader[0], splitheader[1]);
-            }
-
-            headers.forEach((name, value) -> {
-                if (name.equals("Status")){
-                    String[] splitStatus = value.get(0).split(" ");
-
-                    response.statuscode = Integer.parseInt(splitStatus[0]);
-                }
-            });
-
-            headers.remove("Status");
-
-            response.headers = headers;
-            response.body = body.toString();
-        } catch (Exception err){
-            if (this.onError != null) this.onError.accept(err);
-
-            return null;
-        }
-
-        return response;
-    }
-
-
-    /**
-     * Checks if the Unix Socket file exists and if the filename of the PHP Unix Socket ends is formatted correctly (phpX-fpm.sock or phpX.X-fpm.sock).
-     * @param file The file to be checked.
-     * @return True / False depending on if the filename is correctly formatted and if the Unix Socket file exists.
-     */
-    private boolean validatePHPUnixSocketPath(File file){
-        final Pattern SOCKET_PATTERN = Pattern.compile("^php\\d+(\\.\\d+)?-fpm\\.sock$");
-
-        if (file == null) return false;
-        if (!file.exists()) return false;
-
-        return SOCKET_PATTERN.matcher(file.getName()).matches();
+        if (this.useThreadPool){
+            return JavaPHP.threadPool.submit(runLogic).get();
+        } else return runLogic.call();
     }
 
 

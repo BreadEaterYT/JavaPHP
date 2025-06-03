@@ -6,15 +6,18 @@ import fr.breadeater.javaphp.Response;
 
 import java.io.File;
 import java.net.InetSocketAddress;
+import java.util.concurrent.Executors;
 
 /**
- * The Main class is used to test the library
+ * This class is used to test the library
  */
-
 public class JavaPHPTest {
-    public static void main(String[] args){
+    public static void main(String[] args) throws Exception {
         JavaPHP javaphp = new JavaPHP(new InetSocketAddress("127.0.0.1", 7000));
         Headers headers = new Headers();
+
+        javaphp.useThreadPool(true);
+        javaphp.setThreadPool(Executors.newFixedThreadPool(6));
 
         javaphp.onError((err) -> {
             try {
@@ -23,8 +26,6 @@ public class JavaPHPTest {
                 throw new RuntimeException(e);
             }
         });
-
-        // javaphp.useUnixSocket(true, new File("/run/php/php8.4-fpm.sock"));
 
         headers.add("Content-Type", "text/plain");
 
@@ -37,6 +38,8 @@ public class JavaPHPTest {
                 .setRequestHeaders(headers)
                 .setHTTPS(false);
 
+        // ... or use Request.parseExchange() instead of setting everything manually if using Java HttpServer / HttpsServer
+
         JavaPHP.Options options = new JavaPHP.Options()
                 .setPHPDocumentRoot(new File("./").getAbsolutePath())
                 .setPHPFilepath(new File("./index.php").getAbsolutePath())
@@ -48,7 +51,7 @@ public class JavaPHPTest {
 
         response.getHeaders().forEach((name, value) -> System.out.println(name + ": " + value.get(0)));
 
-        System.out.println(response.getStatusCode());
+        System.out.println(response.getStatus());
         System.out.println(response.getBody());
     }
 }
