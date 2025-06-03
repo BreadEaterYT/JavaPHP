@@ -4,7 +4,7 @@
 
 |              Version         |         Supported         |
 | ---------------------------- | ------------------------- |
-| 2.0.x                        |    :heavy_check_mark:     |
+| 2.x.x                        |    :heavy_check_mark:     |
 | beta-v1.1.0-production-ready |    :x:                    |
 | 1.0.0                        |    :x:                    |
 
