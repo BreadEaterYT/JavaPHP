@@ -1,5 +1,7 @@
 ## JavaPHP
 
+⚠️⚠️<strong>Warning:</strong> The project is considered done because i finished what i wanted to do, integrate PHP to Java, no updates will be done unless i find another feature to implement or there's a vulnerability⚠️⚠️
+
 JavaPHP is a lightweight Java library that permits to execute PHP code into Java, it does not rely on any dependencies and is fully standalone.
 
 It can be used with Webservers (NanoHTTPD, Java HttpServer, etc...) or as a part of a normal Java project.
